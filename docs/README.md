@@ -1,5 +1,5 @@
 # Emessages  
-**Image Steganography Tool for Encoding and Decoding a picture with encrypted message**  
+**Image Steganography Tool for Encoding and Decoding a picture with encrypted message.**  
 
 ---  
 
@@ -8,33 +8,24 @@
 | Section | Description |
 |---------|-------------|
 | **[Installation](#installation)** | How to get Emessages up and running on your machine. |
-| **[Quick Start (CLI)](#quick-start-cli)** | One‑line commands to encode/decode images. |
-| **[Usage (Python API)](#usage-python-api)** | Detailed description of the public API. |
-| **[API Reference](#api-reference)** | Full reference for modules, classes, and functions. |
-| **[Examples](#examples)** | Real‑world snippets – CLI and Python – showing typical workflows. |
-| **[Configuration & Encryption](#configuration--encryption)** | How to choose encryption algorithms, key handling, and security tips. |
-| **[Testing & Contributing](#testing--contributing)** | Run the test‑suite and help improve Emessages. |
-| **[License](#license)** | Open‑source licensing information. |
+| **[Quick Start](#quick-start)** | One‑line commands to encode/decode a message. |
+| **[Usage](#usage)** | Detailed CLI options, configuration, and runtime flags. |
+| **[API Documentation](#api-documentation)** | Python functions, classes, and type hints for developers. |
+| **[Examples](#examples)** | Real‑world scenarios – from the command line and from Python code. |
+| **[Troubleshooting & FAQ](#troubleshooting--faq)** | Common pitfalls and their solutions. |
+| **[Contributing](#contributing)** | How to help improve Emessages. |
+| **[License](#license)** | Open‑source license information. |
 
 ---  
 
 ## Installation  
 
-Emessages is pure‑Python and works on **Python 3.9+**. It has no external binary dependencies – only standard cryptography and image‑processing libraries.
+Emessages is a pure‑Python package that works on Windows, macOS, and Linux. It requires **Python 3.9+**.
 
-### 1. Prerequisites  
-
-| Dependency | Reason |
-|------------|--------|
-| `python >= 3.9` | Language runtime |
-| `pip` | Package manager |
-| `virtualenv` (optional) | Isolate the environment |
-| `libjpeg` / `libpng` (system) | Required only if you plan to use the optional Pillow‑based image loaders on some Linux distros (most wheels bundle the needed binaries). |
-
-### 2. Install via PyPI (recommended)
+### 1️⃣ From PyPI (recommended)
 
 ```bash
-# Create an isolated environment (optional but recommended)
+# Create a virtual environment (optional but recommended)
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 
@@ -42,149 +33,164 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install emessages
 ```
 
-### 3. Install from source (latest development)
+### 2️⃣ From source (latest development version)
 
 ```bash
-# Clone the repo
+# Clone the repository
 git clone https://github.com/your-org/Emessages.git
 cd Emessages
 
-# Install in editable mode (useful for development)
-pip install -e .
+# Install in editable mode with all optional dependencies
+pip install -e ".[dev]"
 ```
 
-### 4. Verify the installation  
+> **Note** – The optional `dev` extras install testing tools (`pytest`, `tox`) and documentation helpers (`mkdocs`).  
 
-```bash
-$ emessages --version
-Emessages 2.3.1
-```
+### 3️⃣ System dependencies  
 
-If you see the version string, you’re ready to go!
+| Dependency | Why it’s needed | Install (apt) | Install (brew) |
+|------------|----------------|---------------|----------------|
+| `libjpeg` / `libpng` | Pillow needs the underlying image libraries. | `sudo apt-get install libjpeg-dev libpng-dev` | `brew install libjpeg libpng` |
+| `ffmpeg` (optional) | Allows embedding messages into video frames. | `sudo apt-get install ffmpeg` | `brew install ffmpeg` |
+
+If you only work with PNG/BMP images, Pillow will work out‑of‑the‑box on most platforms.
 
 ---  
 
-## Quick Start (CLI)
-
-Emessages ships with a convenient command‑line interface called `emessages`.  
-All commands share a common `--key` argument for the symmetric encryption key (a 32‑byte base64 string).  
-
-### 1. Generate a random encryption key  
+## Quick Start  
 
 ```bash
-# Generates a 256‑bit key and prints it in base64
-emessages genkey
-# Example output:
-#   Your encryption key (keep it safe!):
-#   bXlTZWNyZXRrZXlGb3JTdGFnZ2luZzEyMw==
+# Encode a secret message into an image (output will be saved as out.png)
+emessages encode -i secret.png -o out.png -m "The password is 42!"
+
+# Decode the hidden message
+emessages decode -i out.png
 ```
 
-> **⚠️** Store the key securely – losing it means you cannot recover hidden messages.
+Both commands will automatically encrypt the message using AES‑256‑GCM with a password you provide (`--password`). If you omit `--password`, Emessages will prompt you securely.
 
-### 2. Encode (hide) a message  
+---  
+
+## Usage  
+
+Emessages ships a single entry‑point script: **`emessages`**.  
+Run `emessages --help` for a full list of sub‑commands and options.
+
+### 1️⃣ Encode  
 
 ```bash
 emessages encode \
-    --input  original.png \
-    --output secret.png \
-    --message "Meet me at 23:00 on the rooftop." \
-    --key bXlTZWNyZXRrZXlGb3JTdGFnZ2luZzEyMw==
+    -i <input_image> \
+    -o <output_image> \
+    -m "<message>" \
+    [--password <pwd>] \
+    [--algorithm aes256gcm|chacha20] \
+    [--bits-per-channel <1|2|4|8>] \
+    [--compress] \
+    [--metadata "<key=value>" ...]
 ```
 
-**Flags**
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-i, --input` | Path to the cover image (PNG, BMP, JPEG). | – |
+| `-o, --output` | Path where the stego‑image will be written. | – |
+| `-m, --message` | Plain‑text message to hide. Use `@file.txt` to read from a file. | – |
+| `--password` | Password for symmetric encryption. If omitted, you’ll be prompted. | Prompt |
+| `--algorithm` | Encryption algorithm (`aes256gcm` is the default). | `aes256gcm` |
+| `--bits-per-channel` | Number of LSBs used per colour channel (1‑8). Higher values increase capacity but reduce visual quality. | `2` |
+| `--compress` | Run zlib compression on the plaintext before encryption (recommended for long messages). | Off |
+| `--metadata` | Optional key‑value pairs stored as PNG text chunks (e.g., `author=John`). | – |
+| `--dry-run` | Validate capacity and parameters without writing a file. | Off |
+| `-v, --verbose` | Show detailed progress information. | Off |
 
-| Flag | Description |
-|------|-------------|
-| `--input` | Path to the cover image (PNG, JPEG, BMP, …). |
-| `--output` | Destination file that will contain the hidden payload. |
-| `--message` | Plain‑text message to embed. |
-| `--key` | Base64‑encoded 256‑bit symmetric key (AES‑GCM). |
-| `--bits-per-channel` *(optional)* | Number of LSBs to use per colour channel (default = 1). |
-| `--compress` *(optional)* | Compress the message with zlib before encryption (default = True). |
+#### Capacity Check  
 
-### 3. Decode (extract) a message  
+```bash
+emessages capacity -i secret.png --bits-per-channel 2
+```
+
+The command prints the maximum number of bytes that can be stored with the chosen LSB depth.
+
+### 2️⃣ Decode  
 
 ```bash
 emessages decode \
-    --input secret.png \
-    --key bXlTZWNyZXRrZXlGb3JTdGFnZ2luZzEyMw==
+    -i <stego_image> \
+    [--password <pwd>] \
+    [--algorithm aes256gcm|chacha20] \
+    [--output <output_file>] \
+    [--verbose]
 ```
 
-The tool prints the recovered plaintext to `stdout`. Use `--out-file` to write it to a file.
+| Option | Description |
+|--------|-------------|
+| `-i, --input` | Path to the image that contains a hidden message. |
+| `--password` | Password used during encoding. If omitted, you’ll be prompted. |
+| `--algorithm` | Must match the algorithm used for encoding. |
+| `--output` | Write the recovered plaintext to a file instead of stdout. |
+| `-v, --verbose` | Show intermediate steps (e.g., extracted ciphertext size). |
 
-### 4. Help & Full CLI reference  
+### 3️⃣ Miscellaneous Sub‑commands  
 
-```bash
-emessages --help
-```
+| Sub‑command | Purpose |
+|-------------|---------|
+| `capacity` | Compute how many bytes can be hidden in a given image. |
+| `info` | Print image metadata, colour mode, and steganographic parameters (if present). |
+| `version` | Show the installed Emessages version. |
 
 ---  
 
-## Usage (Python API)
+## API Documentation  
 
-You can also embed/extract messages programmatically. The public API lives in the `emessages` package.
+> **Tip** – The public API lives in the `emessages` package. Import it in your Python code:
 
 ```python
-from emessages import StegoEngine, CryptoHelper
-
-# 1️⃣  Load or generate a symmetric key (bytes)
-key = CryptoHelper.generate_key()          # 32‑byte key (AES‑256‑GCM)
-# Or decode a stored base64 key:
-# key = CryptoHelper.key_from_b64("bXlTZWNyZXRrZXlGb3JTdGFnZ2luZzEyMw==")
-
-# 2️⃣  Create a StegoEngine instance (you can reuse it)
-engine = StegoEngine(key=key, bits_per_channel=1)
-
-# 3️⃣  Encode a message
-engine.encode(
-    cover_path="original.png",
-    output_path="secret.png",
-    message="The launch code is 0420."
-)
-
-# 4️⃣  Decode a message
-recovered = engine.decode("secret.png")
-print("Recovered:", recovered)
+from emessages import StegoEngine, EncryptionScheme, StegoError
 ```
 
 ### Core Classes  
 
-| Class | Purpose |
-|-------|---------|
-| `StegoEngine` | High‑level façade for encoding/decoding images. Handles LSB manipulation, optional compression, and encryption. |
-| `CryptoHelper` | Thin wrapper around **cryptography** primitives (AES‑GCM, key generation, base64 helpers). |
-| `ImageAdapter` (internal) | Abstracts Pillow / OpenCV image handling; you can plug your own loader if needed. |
+| Class | Description |
+|-------|-------------|
+| **`StegoEngine`** | High‑level façade that bundles encoding/decoding, encryption, and image handling. |
+| **`EncryptionScheme`** | Abstract base class for encryption algorithms (`AES256GCM`, `ChaCha20Poly1305`). |
+| **`StegoError`** | Custom exception hierarchy (`CapacityError`, `DecryptionError`, `InvalidImageError`). |
 
-### Important Parameters  
+#### `StegoEngine`  
 
-| Parameter | Type | Default | Meaning |
-|-----------|------|---------|---------|
-| `key` | `bytes` | **required** | 32‑byte secret used for AES‑GCM encryption. |
-| `bits_per_channel` | `int` | `1` | How many least‑significant bits of each colour channel are used for payload. Higher values increase capacity but degrade visual quality. |
-| `compress` | `bool` | `True` | Run `zlib.compress` on the plaintext before encryption (recommended). |
-| `max_capacity` (property) | `int` | – | Maximum number of bytes that can be hidden in the current cover image with the chosen `bits_per_channel`. |
-
----  
-
-## API Reference  
-
-Below is the **public** API that you should rely on. All internal helpers are deliberately undocumented to allow future refactoring.
-
-### `emessages.CryptoHelper`
+```python
+class StegoEngine:
+    def __init__(
+        self,
+        bits_per_channel: int = 2,
+        algorithm: EncryptionScheme = AES256GCM(),
+        compress: bool = False,
+        metadata: dict[str, str] | None = None,
+    ) -> None:
+        ...
+```
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `generate_key()` | `() -> bytes` | Returns a fresh 32‑byte random key (AES‑256‑GCM). |
-| `key_to_b64(key: bytes) -> str` | `bytes` → `str` | Encode a raw key to a URL‑safe base64 string (for storage). |
-| `key_from_b64(b64_key: str) -> bytes` | `str` → `bytes` | Decode a base64 key back to raw bytes. |
-| `encrypt(plaintext: bytes, key: bytes) -> Tuple[bytes, bytes]` | `(bytes, bytes)` → `(ciphertext, nonce)` | AES‑GCM encryption; returns ciphertext and the 12‑byte nonce. |
-| `decrypt(ciphertext: bytes, nonce: bytes, key: bytes) -> bytes` | `(bytes, bytes, bytes)` → `bytes` | Reverse of `encrypt`. Raises `InvalidTag` on tampering. |
+| **`encode`** | `encode(cover: Path | Image.Image, message: bytes, password: str) -> Image.Image` | Returns a new Pillow `Image` with the encrypted payload hidden. |
+| **`decode`** | `decode(stego: Path | Image.Image, password: str) -> bytes` | Extracts, decrypts, and returns the original plaintext. |
+| **`capacity`** | `capacity(image: Path | Image.Image) -> int` | Maximum number of **bytes** that can be stored with the current `bits_per_channel`. |
+| **`set_metadata`** | `set_metadata(image: Image.Image, meta: dict[str, str]) -> Image.Image` | Stores arbitrary key‑value pairs in PNG text chunks (or EXIF for JPEG). |
+| **`get_metadata`** | `get_metadata(image: Path | Image.Image) -> dict[str, str]` | Retrieves stored metadata. |
 
-### `emessages.StegoEngine`
+#### Encryption Schemes  
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `__init__(key: bytes, bits_per_channel: int = 1, compress: bool = True)` | – | Initialise the engine. |
-| `encode(cover_path: str, output_path: str, message: str, **kwargs)` | – | Hide `message` inside `cover_path` and write to `output_path`. Raises `StegoError` on capacity overflow. |
-| `decode(stego_path: str) -> str` | – | Extract and return the hidden plaintext from `stego_path`. |
-| `max_capacity(cover_path
+```python
+class AES256GCM(EncryptionScheme):
+    def encrypt(self, plaintext: bytes, password: str) -> bytes: ...
+    def decrypt(self, ciphertext: bytes, password: str) -> bytes: ...
+
+class ChaCha20Poly1305(EncryptionScheme):
+    ...
+```
+
+Both schemes use **PBKDF2‑HMAC‑SHA256** (default 200 000 iterations) to derive a 256‑bit key from the password, and they prepend a 12‑byte nonce to the ciphertext.
+
+### Helper Functions  
+
+| Function | Signature
